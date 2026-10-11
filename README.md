@@ -15,6 +15,8 @@
 | Инфраструктура | Docker Compose (multi-stage), nginx, GitHub Actions |
 | Качество | PHPUnit, Vitest, Playwright, PHPStan (Larastan, level 6), PHP CS Fixer, Prettier |
 
+Исходное задание и пример файла импорта лежат в папке [requirements/](requirements/).
+
 > **Отступления от исходного ТЗ.** В ТЗ указаны Slim + Doctrine и Symfony Messenger. Backend по требованию
 > сделан на **Laravel**, поэтому использованы их аналоги: Eloquent вместо Doctrine и
 > Laravel Queue с драйвером RabbitMQ вместо Symfony Messenger. Архитектурные требования (Service-слой,
