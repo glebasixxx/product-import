@@ -1,0 +1,13 @@
+**/node_modules
+**/vendor
+**/.angular
+**/dist
+**/.git
+**/.env
+**/storage/logs/*
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+**/coverage
+**/test-results
+**/playwright-report

@@ -1,0 +1,391 @@
+openapi: 3.0.3
+info:
+  title: Product Import API
+  version: 1.0.0
+  description: |
+    Импорт товаров из `.xlsx`, список товаров с серверной пагинацией и фильтрами, карточка товара.
+
+    Все эндпоинты, кроме `/api/health` и `/api/auth/login`, требуют заголовок
+    `Authorization: Bearer <token>`. Токен выдаёт `POST /api/auth/login`.
+servers:
+  - url: /
+tags:
+  - name: Auth
+  - name: Products
+  - name: Imports
+  - name: System
+
+paths:
+  /api/health:
+    get:
+      tags: [System]
+      summary: Health check (БД, брокер, хранилище)
+      security: []
+      responses:
+        '200':
+          description: Все проверки пройдены
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: Хотя бы одна проверка не пройдена
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Вход, выдача Bearer токена
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: admin@example.com }
+                password: { type: string, example: password }
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string, example: '1|lA2b...' }
+                  token_type: { type: string, example: Bearer }
+                  user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Текущий пользователь
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Отзыв текущего токена
+      responses:
+        '204': { description: Токен отозван }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/products:
+    get:
+      tags: [Products]
+      summary: Список товаров (серверная пагинация, поиск, фильтры)
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: name, in: query, description: Поиск по подстроке в наименовании (без учёта регистра), schema: { type: string } }
+        - { name: price_min, in: query, schema: { type: number, minimum: 0 } }
+        - { name: price_max, in: query, schema: { type: number, minimum: 0 } }
+        - { name: sort, in: query, schema: { type: string, enum: [id, name, price, discount, created_at], default: id } }
+        - { name: direction, in: query, schema: { type: string, enum: [asc, desc], default: asc } }
+      responses:
+        '200':
+          description: Страница товаров
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductSummary' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Products]
+      summary: Создать товар
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductInput' }
+      responses:
+        '201':
+          description: Создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /api/products/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Products]
+      summary: Карточка товара с атрибутами и изображениями
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Products]
+      summary: Обновить товар (поля опциональны, discount пересчитывается)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Products]
+      summary: Удалить товар (атрибуты и изображения удаляются каскадно)
+      responses:
+        '204': { description: Удалён }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/imports:
+    get:
+      tags: [Imports]
+      summary: Последние 10 импортов
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Import' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Imports]
+      summary: Загрузить xlsx и поставить импорт в очередь
+      description: |
+        Файл валидируется (расширение `.xlsx`, MIME по содержимому, размер до 10 МБ),
+        сохраняется и отправляется в очередь RabbitMQ. Обработка асинхронная —
+        прогресс и отчёт об ошибках доступны через `GET /api/imports/{id}`.
+        Ограничение: 5 запросов в минуту на пользователя.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '202':
+          description: Импорт принят в обработку
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Import' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/imports/{id}:
+    get:
+      tags: [Imports]
+      summary: Статус, прогресс и отчёт импорта (для polling)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Import' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  responses:
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Не найдено
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Превышен лимит запросов
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Ошибка валидации
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+              errors:
+                type: object
+                additionalProperties:
+                  type: array
+                  items: { type: string }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        message: { type: string }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, fail] }
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status: { type: string, enum: [ok, fail] }
+              message: { type: string }
+
+    PaginationMeta:
+      type: object
+      properties:
+        page: { type: integer, example: 1 }
+        limit: { type: integer, example: 20 }
+        total: { type: integer, example: 40 }
+        total_pages: { type: integer, example: 2 }
+
+    ProductSummary:
+      type: object
+      properties:
+        id: { type: integer }
+        external_code: { type: string }
+        name: { type: string }
+        price: { type: number, example: 1320 }
+        purchase_price: { type: number, nullable: true, example: 880 }
+        discount: { type: number, nullable: true, example: 33.33, description: '(price - purchase_price) / price * 100' }
+        thumbnail_url: { type: string, nullable: true }
+
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/ProductSummary'
+        - type: object
+          properties:
+            description: { type: string, nullable: true }
+            attributes:
+              type: array
+              items: { $ref: '#/components/schemas/ProductAttribute' }
+            images:
+              type: array
+              items: { $ref: '#/components/schemas/ProductImage' }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+
+    ProductAttribute:
+      type: object
+      properties:
+        id: { type: integer }
+        key: { type: string, example: Цвет }
+        value: { type: string, example: Grigio/Verde }
+
+    ProductImage:
+      type: object
+      properties:
+        id: { type: integer }
+        url: { type: string, description: Исходная ссылка из файла }
+        path: { type: string, nullable: true, description: Локальный путь (null, если скачать не удалось) }
+        public_url: { type: string, description: URL для отображения (локальная копия или исходная ссылка) }
+        position: { type: integer }
+
+    ProductInput:
+      type: object
+      required: [external_code, name, price]
+      properties:
+        external_code: { type: string, maxLength: 255 }
+        name: { type: string, maxLength: 512 }
+        description: { type: string, nullable: true }
+        price: { type: number, minimum: 0 }
+        purchase_price: { type: number, minimum: 0, nullable: true }
+        attributes:
+          type: array
+          items:
+            type: object
+            required: [key, value]
+            properties:
+              key: { type: string }
+              value: { type: string }
+
+    Import:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [pending, processing, completed, failed] }
+        original_filename: { type: string }
+        total_rows: { type: integer }
+        processed_rows: { type: integer }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        created_count: { type: integer }
+        updated_count: { type: integer }
+        failed_count: { type: integer }
+        errors:
+          type: array
+          description: Невалидные строки (не прерывают импорт)
+          items:
+            type: object
+            properties:
+              row: { type: integer, description: Номер строки в xlsx }
+              external_code: { type: string, nullable: true }
+              messages: { type: array, items: { type: string } }
+        warnings:
+          type: array
+          description: Некритичные проблемы (например, не скачалось изображение)
+          items:
+            type: object
+            properties:
+              row: { type: integer }
+              external_code: { type: string, nullable: true }
+              message: { type: string }
+        failure_reason: { type: string, nullable: true }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+security:
+  - bearerAuth: []

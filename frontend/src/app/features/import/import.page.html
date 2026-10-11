@@ -1,0 +1,215 @@
+@let job = job$ | async;
+@let history = history$ | async;
+
+<header class="page-header">
+  <h1>Импорт товаров</h1>
+  <p class="subtitle">
+    Загрузите <b>.xlsx</b> файл (до 10 МБ). Товары обновляются по внешнему коду, изображения
+    скачиваются автоматически.
+  </p>
+</header>
+
+<mat-card appearance="outlined" class="upload-card">
+  <div
+    class="dropzone"
+    [class.drag-over]="dragOver()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave()"
+    (drop)="onDrop($event)"
+  >
+    <mat-icon class="dropzone-icon">cloud_upload</mat-icon>
+
+    @if (selectedFile(); as file) {
+      <p class="file-name" data-testid="selected-file">{{ file.name }}</p>
+      <p class="muted">{{ file.size / 1024 | number: '1.0-0' }} КБ</p>
+    } @else {
+      <p>Перетащите файл сюда или выберите на компьютере</p>
+    }
+
+    @if (fileError()) {
+      <p class="error" role="alert" data-testid="file-error">{{ fileError() }}</p>
+    }
+
+    <div class="actions">
+      <input
+        #fileInput
+        type="file"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        hidden
+        data-testid="file-input"
+        (change)="onFileSelected($event)"
+      />
+      <button mat-stroked-button type="button" (click)="fileInput.click()">
+        <mat-icon>folder_open</mat-icon> Выбрать файл
+      </button>
+      <button
+        mat-flat-button
+        type="button"
+        data-testid="upload-button"
+        [disabled]="!selectedFile() || !!fileError() || uploading()"
+        (click)="upload()"
+      >
+        <mat-icon>upload</mat-icon> Загрузить
+      </button>
+    </div>
+  </div>
+
+  @if (uploading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+</mat-card>
+
+@if (job) {
+  <mat-card appearance="outlined" class="job-card" data-testid="import-job">
+    <mat-card-header>
+      <mat-card-title>{{ job.original_filename }}</mat-card-title>
+      <mat-card-subtitle
+        >Запущен {{ job.created_at | date: 'dd.MM.yyyy HH:mm:ss' }}</mat-card-subtitle
+      >
+      <span class="spacer"></span>
+      <span class="status status-{{ job.status }}" data-testid="import-status">{{
+        statusLabel(job.status)
+      }}</span>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="progress">
+        <mat-progress-bar
+          [mode]="job.status === 'pending' ? 'query' : 'determinate'"
+          [value]="job.progress"
+          aria-label="Прогресс импорта"
+        />
+        <span class="progress-value" data-testid="import-progress">{{ job.progress }}%</span>
+      </div>
+      <p class="muted">Обработано строк: {{ job.processed_rows }} из {{ job.total_rows || '…' }}</p>
+
+      <div class="counters">
+        <div class="counter">
+          <span class="counter-value" data-testid="created-count">{{ job.created_count }}</span>
+          <span class="counter-label">создано</span>
+        </div>
+        <div class="counter">
+          <span class="counter-value">{{ job.updated_count }}</span>
+          <span class="counter-label">обновлено</span>
+        </div>
+        <div class="counter" [class.counter-error]="job.failed_count > 0">
+          <span class="counter-value" data-testid="failed-count">{{ job.failed_count }}</span>
+          <span class="counter-label">с ошибками</span>
+        </div>
+        <div class="counter" [class.counter-warning]="job.warnings.length > 0">
+          <span class="counter-value">{{ job.warnings.length }}</span>
+          <span class="counter-label">предупреждений</span>
+        </div>
+      </div>
+
+      @if (job.status === 'failed' && job.failure_reason) {
+        <div class="banner banner-error" role="alert">
+          <mat-icon>error</mat-icon>
+          <span>{{ job.failure_reason }}</span>
+        </div>
+      }
+
+      @if (isFinished(job)) {
+        @if (job.status === 'completed' && job.errors.length === 0) {
+          <div class="banner banner-success">
+            <mat-icon>check_circle</mat-icon>
+            <span>Импорт завершён без ошибок.</span>
+            <a mat-button routerLink="/products">Перейти к товарам</a>
+          </div>
+        }
+
+        @if (job.errors.length > 0) {
+          <h3>Отчёт об ошибках</h3>
+          <p class="muted">Эти строки пропущены, остальные товары импортированы.</p>
+          <div class="table-scroll">
+            <table
+              mat-table
+              [dataSource]="job.errors"
+              class="errors-table"
+              data-testid="errors-table"
+            >
+              <ng-container matColumnDef="row">
+                <th mat-header-cell *matHeaderCellDef>Строка</th>
+                <td mat-cell *matCellDef="let error">{{ error.row }}</td>
+              </ng-container>
+              <ng-container matColumnDef="external_code">
+                <th mat-header-cell *matHeaderCellDef>Внешний код</th>
+                <td mat-cell *matCellDef="let error" class="mono">
+                  {{ error.external_code ?? '—' }}
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="messages">
+                <th mat-header-cell *matHeaderCellDef>Ошибки</th>
+                <td mat-cell *matCellDef="let error">
+                  @for (message of error.messages; track $index) {
+                    <div>{{ message }}</div>
+                  }
+                </td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="errorColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: errorColumns"></tr>
+            </table>
+          </div>
+        }
+
+        @if (job.warnings.length > 0) {
+          <mat-accordion>
+            <mat-expansion-panel class="warnings">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon class="warning-icon">warning</mat-icon>
+                  Предупреждения ({{ job.warnings.length }})
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+              <ul class="warning-list">
+                @for (warning of job.warnings; track $index) {
+                  <li>
+                    <b>Строка {{ warning.row }}</b>
+                    @if (warning.external_code) {
+                      <span class="mono">({{ warning.external_code }})</span>
+                    }
+                    — {{ warning.message }}
+                  </li>
+                }
+              </ul>
+            </mat-expansion-panel>
+          </mat-accordion>
+        }
+      }
+    </mat-card-content>
+  </mat-card>
+}
+
+@if (history && history.length > 0) {
+  <mat-card appearance="outlined" class="history-card">
+    <mat-card-header>
+      <mat-card-title>История импортов</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <ul class="history">
+        @for (item of history; track item.id) {
+          <li [class.current]="item.id === job?.id">
+            <div class="history-main">
+              <span class="history-name">{{ item.original_filename }}</span>
+              <span class="muted">{{ item.created_at | date: 'dd.MM.yyyy HH:mm' }}</span>
+            </div>
+            <span class="muted"
+              >+{{ item.created_count }} / ~{{ item.updated_count }} / ✕{{
+                item.failed_count
+              }}</span
+            >
+            <span class="status status-{{ item.status }}">{{ statusLabel(item.status) }}</span>
+            <button
+              mat-icon-button
+              matTooltip="Показать отчёт"
+              aria-label="Показать отчёт"
+              (click)="showReport(item)"
+            >
+              <mat-icon>visibility</mat-icon>
+            </button>
+          </li>
+        }
+      </ul>
+    </mat-card-content>
+  </mat-card>
+}

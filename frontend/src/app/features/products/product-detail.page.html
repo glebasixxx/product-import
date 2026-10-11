@@ -1,0 +1,114 @@
+@let state = state$ | async;
+@let listQuery = listQuery$ | async;
+
+<a mat-button class="back" routerLink="/products" [queryParams]="listQuery">
+  <mat-icon>arrow_back</mat-icon> К списку товаров
+</a>
+
+@if (!state || state.status === 'loading') {
+  <div class="center"><mat-spinner diameter="48" /></div>
+} @else if (state.status === 'error') {
+  <mat-card appearance="outlined" class="error-card" role="alert">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ state.message }}</span>
+  </mat-card>
+} @else {
+  @let product = state.product;
+
+  <div class="layout">
+    <section class="gallery" aria-label="Изображения товара">
+      @if (product.images.length > 0) {
+        @let current = product.images[selectedImage()];
+        <div class="main-image">
+          <img [src]="current.public_url" [alt]="product.name" data-testid="main-image" />
+        </div>
+
+        @if (product.images.length > 1) {
+          <div class="thumbs">
+            @for (image of product.images; track image.id; let i = $index) {
+              <button
+                type="button"
+                class="thumb"
+                [class.active]="i === selectedImage()"
+                [attr.aria-label]="'Изображение ' + (i + 1)"
+                (click)="selectImage(i)"
+              >
+                <img [src]="image.public_url" alt="" loading="lazy" />
+              </button>
+            }
+          </div>
+        }
+      } @else {
+        <div class="main-image empty">
+          <mat-icon>image_not_supported</mat-icon>
+          <span>Нет изображений</span>
+        </div>
+      }
+    </section>
+
+    <section class="info">
+      <p class="code">
+        Внешний код: <span class="mono">{{ product.external_code }}</span>
+      </p>
+      <h1 data-testid="product-name">{{ product.name }}</h1>
+
+      <div class="price-block">
+        <span class="price">{{ product.price | number: '1.2-2' }} ₽</span>
+        @if (product.discount !== null) {
+          <span class="discount" data-testid="product-discount"
+            >скидка {{ product.discount | number: '1.0-2' }}%</span
+          >
+        }
+      </div>
+
+      <dl class="facts">
+        <div>
+          <dt>Цена продажи</dt>
+          <dd>{{ product.price | number: '1.2-2' }} ₽</dd>
+        </div>
+        <div>
+          <dt>Закупочная цена</dt>
+          <dd>
+            @if (product.purchase_price !== null) {
+              {{ product.purchase_price | number: '1.2-2' }} ₽
+            } @else {
+              —
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>Скидка</dt>
+          <dd>
+            {{ product.discount !== null ? (product.discount | number: '1.0-2') + '%' : '—' }}
+          </dd>
+        </div>
+      </dl>
+
+      @if (product.description) {
+        <mat-divider />
+        <h2>Описание</h2>
+        <p class="description">{{ product.description }}</p>
+      }
+    </section>
+  </div>
+
+  <mat-card appearance="outlined" class="attributes-card">
+    <mat-card-header>
+      <mat-card-title>Характеристики</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (product.attributes.length > 0) {
+        <dl class="attributes" data-testid="product-attributes">
+          @for (attribute of product.attributes; track attribute.id) {
+            <div class="attribute">
+              <dt>{{ attribute.key }}</dt>
+              <dd>{{ attribute.value }}</dd>
+            </div>
+          }
+        </dl>
+      } @else {
+        <p class="muted">Дополнительные атрибуты отсутствуют</p>
+      }
+    </mat-card-content>
+  </mat-card>
+}

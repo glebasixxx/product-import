@@ -1,0 +1,138 @@
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  h1 {
+    margin: 0;
+    font: var(--mat-sys-headline-medium);
+  }
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.filters-card {
+  margin-bottom: 16px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.name-field {
+  flex: 1 1 260px;
+}
+
+.price-field {
+  flex: 0 1 160px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.table-card {
+  overflow: hidden;
+}
+
+.progress-slot {
+  height: 4px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.products-table {
+  width: 100%;
+}
+
+.row {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-high);
+  }
+}
+
+.thumb {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--mat-sys-surface-container);
+}
+
+.thumb-empty {
+  display: grid;
+  place-items: center;
+  color: var(--mat-sys-outline);
+}
+
+.product-link {
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+  font-weight: 500;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.discount {
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  font-size: 13px;
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 16px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.state-error {
+  color: var(--mat-sys-error);
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .price-field {
+    flex: 1 1 120px;
+  }
+
+  .mat-column-external_code {
+    display: none;
+  }
+}

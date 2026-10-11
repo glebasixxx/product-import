@@ -1,0 +1,12 @@
+vendor
+node_modules
+.env
+.phpunit.cache
+.php-cs-fixer.cache
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/app/public/products/*
+bootstrap/cache/*.php
+database/database.sqlite

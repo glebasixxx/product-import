@@ -1,0 +1,8 @@
+.env
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+/task_v6*.md
+/import example*.xlsx
